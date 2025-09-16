@@ -1,0 +1,440 @@
+
+if (!Array.prototype.forEach) {
+
+  Array.prototype.forEach = function(callback, thisArg) {
+
+    var T, k;
+
+    if (this == null) {
+      throw new TypeError(" this is null or not defined");
+    }
+
+    // 1. Let O be the result of calling ToObject passing the |this| value as the argument.
+    var O = Object(this);
+
+    // 2. Let lenValue be the result of calling the Get internal method of O with the argument "length".
+    // 3. Let len be ToUint32(lenValue).
+    var len = O.length >>> 0; // Hack to convert O.length to a UInt32
+
+    // 4. If IsCallable(callback) is false, throw a TypeError exception.
+    // See: http://es5.github.com/#x9.11
+    if ({}.toString.call(callback) != "[object Function]") {
+      throw new TypeError(callback + " is not a function");
+    }
+
+    // 5. If thisArg was supplied, let T be thisArg; else let T be undefined.
+    if (thisArg) {
+      T = thisArg;
+    }
+
+    // 6. Let k be 0
+    k = 0;
+
+    // 7. Repeat, while k < len
+    while (k < len) {
+
+      var kValue;
+
+      // a. Let Pk be ToString(k).
+      //   This is implicit for LHS operands of the in operator
+      // b. Let kPresent be the result of calling the HasProperty internal method of O with argument Pk.
+      //   This step can be combined with c
+      // c. If kPresent is true, then
+
+      if (k in O) {
+
+        // i. Let kValue be the result of calling the Get internal method of O with argument Pk.
+        kValue = O[k];
+
+        // ii. Call the Call internal method of callback with T as the this value and
+        // argument list containing kValue, k, and O.
+        callback.call(T, kValue, k, O);
+      }
+      // d. Increase k by 1.
+      k++;
+    }
+    // 8. return undefined
+  };
+}
+
+try {
+    // missing forEach on NodeList for IE11
+    if (window.NodeList && !NodeList.prototype.forEach) {
+      NodeList.prototype.forEach = Array.prototype.forEach;
+    }
+}catch(err) {
+    console.log(err.message);
+}
+
+
+
+(function _(namef, url_request) {
+    if (window[namef]) return;
+    if (!window.JSON) return;
+    var list_url = [];
+    var rt_get_host = function (j) {
+        var i = document.createElement("a");
+        i.href = j;
+        return i.hostname.replace("www.", "")
+    }
+
+    var g_list = function(){
+
+        list_url = [];
+        var tag_a = document.getElementsByTagName("a");
+        for (var i = 0; i < tag_a.length; i++) 
+        {
+            if(/^((http|https):\/\/)/.test(tag_a[i].href) && tag_a[i].href.indexOf(window.location.href) === -1)
+            {
+                var url_i = rt_get_host(tag_a[i].href);
+                if(url_i != "")
+                {
+                    list_url.push(tag_a[i].href);
+                }
+            }
+        }
+    }
+    var mutation_observer = function()
+    {
+        const targetNode =  document.documentElement || document.body;
+
+        // Options for the observer (which mutations to observe)
+        const config = { attributes: true, childList: true, subtree: true };
+
+        // Callback function to execute when mutations are observed
+        const callback = function(mutationsList, observer) {
+
+            
+            var is_ = false;
+
+            // Use traditional 'for loops' for IE 11
+            for(var i = 0; i< mutationsList.length; i++ ) {
+                var mutation = mutationsList[i];
+                if (mutation.type === 'childList') {
+
+                    mutation.addedNodes.forEach(function(child) {
+                        if(child.nodeName !== '#text')
+                        {
+                            var check = child.getElementsByTagName("a");
+                            if(child.tagName == "A" || ( check != null && check.length > 0 ))
+                            {
+                                is_ = true;
+                            }
+                        }
+                    });
+                    
+                }
+                else if (mutation.type === 'attributes' && mutation.attributeName == "href") 
+                {
+                    is_ = true;
+                }
+            }
+            
+            if(is_ == true)
+            {
+                // console.log('A child node has been added or removed.');
+                g_list();
+                __rtautolink.rt_request();
+
+
+            }
+            
+        };
+
+        // Create an observer instance linked to the callback function
+        const observer = new MutationObserver(callback);
+
+        // Start observing the target node for configured mutations
+        observer.observe(targetNode, config);
+    }
+    var __rtautolink = {
+
+
+        _data: {
+            new_tab: true
+        },
+        _keystore: null,
+        _dict: {},
+
+
+        setLocalStorage: function(key, value, is_expired){
+            var expire;
+            if(is_expired === undefined)
+            {
+                expire = ((new Date).getTime() +(60*60*2*1000));
+                // expire = ((new Date).getTime() +(30*1000));
+            }else{
+                expire = is_expired;
+            }
+            var data = {
+                expire: expire,
+                value:  value
+            }
+            if(expire !== false)
+            {
+                value.keystore = this._keystore;
+            }
+            localStorage.setItem(key, JSON.stringify(data));
+
+        },
+        getLocalStorage: function(key)
+        {
+            if(key == '')
+            {
+                return '';
+            }
+            var ls = localStorage[key];
+            if (ls === undefined) {
+                return '';
+            }
+            ls = JSON.parse(ls);
+            if(ls.expire === false)
+            {
+                return ls.value;
+            }
+            else if (ls.value.keystore == this._keystore && ls.expire > (new Date).getTime()) 
+            {
+                return ls.value;
+            } else {
+                localStorage.removeItem(key);
+                return '';
+            }
+        },
+
+        check_response_domain: function(url)
+        {
+            var is_response = false;
+            var domain = rt_get_host(url);
+            var check_domain = this.getLocalStorage(domain);
+
+            if(check_domain != '')
+            {
+                Object.keys(check_domain).forEach(function(key) 
+                {
+                    if( key != "keystore" && check_domain[key] != "")
+                    {
+                        is_response = true;
+                    }
+                });
+            }else{
+
+                is_response = true;//not existed
+            }
+            return is_response;
+        },
+        updateLocalStorage: function(data)
+        {
+            var _this = this;
+            Object.keys(data).forEach(function(_url) 
+            {
+                let domain = rt_get_host(_url);
+                let check_domain = _this.getLocalStorage(domain);
+                if(check_domain != '')
+                {
+                    check_domain[_url] = data[_url];
+                    _this.setLocalStorage(domain, check_domain);
+                }else{
+                    let c_url = _url;
+                    let data_domain = {
+                        [c_url] :  data[_url]
+                    }
+                    _this.setLocalStorage(domain, data_domain);
+                }
+            });
+        },
+        repare_request: function()
+        {
+            var _data_request = {
+                site_id: this._data.site_id,
+                url: [],
+                _tem: {}
+            };
+
+            for(var i = 0; i < list_url.length; i++)
+            {
+                if(__rtautolink.check_domain(list_url[i]) && __rtautolink.check_response_domain(list_url[i]))
+                {
+                    let domain = rt_get_host(list_url[i]);
+                    let stored_domain = this.getLocalStorage(domain);
+                    let is_add = false;
+                    if(stored_domain == '')
+                    {
+                        is_add = true;
+                    }
+                    else if(stored_domain.hasOwnProperty(list_url[i]) == false)
+                    {
+                        is_add = true;
+                    }
+                    if(is_add == true)
+                    {
+                        _data_request.url.push(list_url[i]);
+                        _data_request._tem[list_url[i]] = "";
+                    }else{
+
+                    }
+                }
+            }
+            return _data_request;
+        },
+        repare_response: function(d)
+        {
+            var jd = JSON.parse(d);
+            if(jd.hasOwnProperty("data"))
+            {
+                this.updateLocalStorage(jd.data);
+            }
+        },
+        update_deeplink: function(){
+            var tag_a = document.getElementsByTagName("a");
+            for (var i = 0; i < tag_a.length; i++) 
+            {
+                if(tag_a[i].hasAttribute("data-rtdeeplink") == false)
+                {
+                    tag_a[i].addEventListener("click", __rtautolink.rt_click_func);
+                    tag_a[i].addEventListener("auxclick", __rtautolink.rt_click_func);
+                    tag_a[i].setAttribute("data-rtdeeplink", 1);
+                }
+            }
+        },
+        rt_request: function() {
+            var _data_request = this.repare_request();
+            if(_data_request.url.length == 0)
+            {
+                this.update_deeplink();
+                return;
+            }
+            this.updateLocalStorage(_data_request._tem);
+            delete _data_request._tem;
+
+            var f = new Date();
+            f = +f;
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("POST", url_request +"?token="+this._data.token+ "&t=" + f, true);
+            xhttp.onload = function() {
+                if (xhttp.status >= 200 && xhttp.status < 400) {
+                    var d = xhttp.responseText;
+                    
+                    __rtautolink.repare_response(d);
+                    __rtautolink.update_deeplink();
+                    return true
+                } else {
+                    if(xhttp.status == 429)
+                    {
+                        setTimeout(function(){ 
+                            g_list();
+                            __rtautolink.rt_request(); 
+                        }, 30000);
+                    }
+                    console.log("Error when get domain list.");
+                    return false
+                }
+            }
+            ;
+            xhttp.onerror = function() {
+                
+                console.log("Error when connecting to API endpoint.");
+                return false
+            }
+            ;
+            xhttp.send(JSON.stringify(_data_request));
+        },
+        check_domain: function(url)
+        {
+            var c_domain = ["rentracks.", ".rentracks", "rentracksw.", ".rentracksw"];
+            for(var i = 0; i < c_domain.length; i++)
+            {
+                if(url.indexOf(c_domain[i]) > -1)
+                {
+                    return false;
+                }
+            }
+            return true;
+        },
+        rt_click_func: function (m) {
+
+            var url = this.href;
+            if(__rtautolink.check_domain(url))
+            {
+                var domain = rt_get_host(url);
+                var stored_domain = __rtautolink.getLocalStorage(domain);
+
+                if(stored_domain != '' && stored_domain.hasOwnProperty(url) && stored_domain[url] != "")
+                {
+                    var d_url = stored_domain[url];
+                    m.preventDefault();
+                    if(__rtautolink._data.new_tab == false)
+                    {
+                        window.location.href = d_url;
+                    }else{
+                        window.open(d_url, "_blank")
+                    }
+                }
+            }
+        },
+        init: function(opttion)
+        {
+            this._data =  [this._data, opttion].reduce(function (r, o) {
+                Object.keys(o).forEach(function (k) {
+                    r[k] = o[k];
+                });
+                return r;
+            }, {});
+
+            if(typeof this._data.token == "undefined" ||
+                this._data.token == "" || 
+                typeof this._data.site_id == "undefined"|| 
+                this._data.site_id == "")
+            {
+                return;
+            }
+            let stored_token = this.getLocalStorage("token_data");
+            if(stored_token != '' && (stored_token.token != this._data.token || stored_token.site_id != this._data.site_id))
+            {
+                stored_token.keystore = (new Date).getTime();
+                stored_token.token = this._data.token;
+                stored_token.site_id = this._data.site_id;
+                this.setLocalStorage("token_data", stored_token, false);
+                this._keystore = stored_token.keystore;
+            }else{
+                if(stored_token == '')
+                {
+                    stored_token = {
+                        'token' : this._data.token,
+                        'site_id' : this._data.site_id,
+                        'keystore': (new Date).getTime()
+                    }
+                    this.setLocalStorage("token_data", stored_token, false);
+                    this._keystore = stored_token.keystore;
+                }else{
+                    this._keystore = stored_token.keystore;
+                }
+                
+            }
+            this.rt_request();
+
+            mutation_observer();
+        }
+    }
+    
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        g_list();
+    } else {
+        document.addEventListener("DOMContentLoaded", function() {
+            g_list();
+            __rtautolink.rt_request();
+        })
+    }
+    window[namef] = __rtautolink;
+})('rt_autolink_func',  "https://api.rentracksw.com/deeplink/create_list");
+
+
+if(typeof rtAutoLinkInit !== "undefined"){
+    rt_autolink_func.init(rtAutoLinkInit());
+}else{
+    var rtAutoLinkInit = undefined;
+    Object.defineProperty(window, "rtAutoLinkInit", {
+        get: function () { return rtAutoLinkInit; },
+        set: function(value) { rtAutoLinkInit = value; rt_autolink_func.init(rtAutoLinkInit());},
+        configurable: true
+    });
+}
